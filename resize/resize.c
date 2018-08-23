@@ -1,4 +1,4 @@
-// Copies a BMP file
+// Copies a BMP file - in progress
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,12 +42,15 @@ int main(int argc, char *argv[])
     }
 
     // read infile's BITMAPFILEHEADER, also make variable for the new?
-    BITMAPFILEHEADER bf, bfoutput;
+    BITMAPFILEHEADER bf;
     fread(&bf, sizeof(BITMAPFILEHEADER), 1, inptr);
 
     // read infile's BITMAPINFOHEADER, also make variable for the new?
-    BITMAPINFOHEADER bi, bioutput;
+    BITMAPINFOHEADER bi;
     fread(&bi, sizeof(BITMAPINFOHEADER), 1, inptr);
+
+    BITMAPFILEHEADER bfoutput = bf;
+    BITMAPINFOHEADER bioutput = bi;
 
     // ensure infile is (likely) a 24-bit uncompressed BMP 4.0
     if (bf.bfType != 0x4d42 || bf.bfOffBits != 54 || bi.biSize != 40 ||
@@ -60,20 +63,23 @@ int main(int argc, char *argv[])
     }
 
     // here, it would be a good place to determine width, height, padding, file size, ec/
-    int outwidth = bi.biWidth * factor;
-    int outheight = bi.biHeight * factor;
+    int outwidth = bioutput.biWidth * factor;
+    int absheight = abs(bioutput.biHeight);
+    int outheight = absheight * factor;
 
     printf("Original height: %i, Original width: %i\n", bi.biHeight, bi.biWidth);
+
+    printf("New height: %i, New width: %i\n", outheight, outwidth);
 
     int padding = (4 - (bi.biWidth * sizeof(RGBTRIPLE)) % 4) % 4;
     int outpadding = (4 - (outwidth * sizeof(RGBTRIPLE)) % 4) % 4;
 
-    bf.bfSize = bi.biSizeImage + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
     bi.biSizeImage = ((sizeof(RGBTRIPLE) * bi.biWidth) + padding) * abs(bi.biHeight);
-    bioutput.biSizeImage = ((sizeof(RGBTRIPLE) * outwidth) + outpadding) * abs(outheight);
-    bfoutput.bfSize = bioutput.biSizeImage + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    bf.bfSize = bi.biSizeImage + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    bioutput.biSizeImage = ((sizeof(RGBTRIPLE) * outwidth) + outpadding) * outheight; // used to be absolute value of outheight
+    bfoutput.bfSize = bioutput.biSizeImage + sizeof(bfoutput) + sizeof(bioutput);
 
-    printf("All variables: %i %i %i %i\n", bf.bfSize, bi.biSizeImage, bioutput.biSizeImage, bfoutput.bfSize);
+    printf("Old image size: %i, Old file size: %i\nNew image size: %i, New file size: %i\n", bi.biSizeImage, bf.bfSize, bioutput.biSizeImage, bfoutput.bfSize);
 
     // write outfile's BITMAPFILEHEADER
     fwrite(&bfoutput, sizeof(BITMAPFILEHEADER), 1, outptr);
@@ -85,56 +91,73 @@ int main(int argc, char *argv[])
     // int padding = (4 - (bi.biWidth * sizeof(RGBTRIPLE)) % 4) % 4;
     // int outpadding = (4 - (outwidth * sizeof(RGBTRIPLE)) % 4) % 4;
 
+
+
+
+   // for (int h = 0; h <= factor; h++) // this is for printing each line factor times
+   // {
+
     // iterate over infile's scanlines
-    for (int i = 0, biHeight = abs(bi.biHeight); i < biHeight*factor; i++) // ADDED *FACTOR
+    for (int i = 0; i < absheight; i++) // added *factor
     {
         // iterate over pixels in scanline -- in this loop would be a good place to
         // print rows
-        for (int j = 0; j < bi.biWidth*factor; j++) /// ADDED *FACTOR
+        for (int j = 0; j < bi.biWidth; j++) // added *factor
         {
             // temporary storage
             RGBTRIPLE triple;
 
             // read RGB triple from infile
-            fread(&triple, sizeof(RGBTRIPLE), 1, inptr);
+            fread(&triple, sizeof(RGBTRIPLE), 1, inptr); // I PUT THIS BELOW IN THE FOR LOOP but now its out here
 
-            for (int k = 0; k <= factor; k++)
+            for (int k = 0; k < factor; k++) // this is being temporarily replaced by *factor in the other loops
             {
-              // write RGB triple to outfile
-              fwrite(&triple, sizeof(RGBTRIPLE), 1, outptr);
+              // read RGB triple from infile
+              // fread(&triple, sizeof(RGBTRIPLE), 1, inptr);
+                for (int l = 0; l < factor; l++) /// this is a newly added for loop
+                {
+                // write RGB triple to outfile
+                 fwrite(&triple, sizeof(RGBTRIPLE), 1, outptr);
+                }
+              printf("rows: %i cols:%i print:%i \n", i, j, k);
+
+
+
             }
+
+          // skip over padding, if any
+          fseek(inptr, padding, SEEK_CUR);
+
+          // add padding to outfile
+          for (int k = 0; k < outpadding; k++)
+          {
+              fputc(0x00, outptr);
+          }
+
+
         }
+        // // skip over padding, if any
+        // fseek(inptr, padding, SEEK_CUR);
 
-
-         ///// THIS NESTED FOR LOOP IS FROM WALKTHROUGH
-        //  for (int i = 0; i < rows*scale+(rows*scale%2); i++)
-        //  {
-        //   for (int j = 0; j < cols*scale+(cols*scale%2); j++)
-        //   {
-        //      printf("o ");
-        //   }
-        //   printf("\n");
-        //  }
-
-
-
-
-        // skip over padding, if any
-        fseek(inptr, padding, SEEK_CUR);
-
-        // then add it back (to demonstrate how) // change if needed, could add padding to outfile?
-        for (int k = 0; k < outpadding; k++)
-        {
-            fputc(0x00, outptr);
-        }
+        // // add padding to outfile
+        // for (int k = 0; k < outpadding; k++)
+        // {
+        //     fputc(0x00, outptr);
+        // }
       /// here could be an ok place to move skipping the padding?
     }
+
+
+   // } /// this is for the h loop
+
 
     // close infile
     fclose(inptr);
 
     // close outfile
     fclose(outptr);
+
+    printf("Program completed.\n");
 
     // success
     return 0;
